@@ -30,7 +30,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      Navigate("/Events")
+      Navigate("/events")
       } catch (err) {
       setError(err.message)
     } finally {
