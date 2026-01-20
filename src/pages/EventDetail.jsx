@@ -16,34 +16,37 @@ export default function EventDetail() {
   const [registering, setRegistering] = useState(false)
   const [message, setMessage] = useState("")
 
-  // 🔹 Fetch single event
+  const [name, setName] = useState("")
+  const [studentId, setStudentId] = useState("")
+
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const eventRef = doc(db, "events", id)
-        const eventSnap = await getDoc(eventRef)
-
-        if (!eventSnap.exists()) {
+        const snap = await getDoc(doc(db, "events", id))
+        if (!snap.exists()) {
           setError("Event not found")
         } else {
-          setEvent({ id: eventSnap.id, ...eventSnap.data() })
+          setEvent({ id: snap.id, ...snap.data() })
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load event")
       } finally {
         setFetching(false)
       }
     }
-
     fetchEvent()
   }, [id])
 
-  // 🔹 Register handler (MUST be outside useEffect)
   const handleRegister = async () => {
     if (!event || !user) return
 
     if (role !== "student") {
-      setMessage("Only students can register for events")
+      setMessage("Only students can register")
+      return
+    }
+
+    if (event.registeredCount >= event.capacity) {
+      setMessage("Event is full")
       return
     }
 
@@ -52,9 +55,15 @@ export default function EventDetail() {
       setMessage("")
 
       await registerForEvent(event.id, user, {
-        name: user.email.split("@")[0],
-        studentId: "TEMP123",
+        name,
+        studentId,
       })
+
+      //  Optimistically update UI
+      setEvent((prev) => ({
+        ...prev,
+        registeredCount: prev.registeredCount + 1,
+      }))
 
       setMessage("Registration successful!")
     } catch (err) {
@@ -64,48 +73,63 @@ export default function EventDetail() {
     }
   }
 
-  // 🔹 Loading state
-  if (loading || fetching) {
-    return <p className="p-6">Loading event...</p>
-  }
+  if (loading || fetching) return <p className="p-6">Loading event...</p>
+  if (error) return <p className="p-6 text-red-600">{error}</p>
+  if (!event) return null
 
-  // 🔹 Error state
-  if (error) {
-    return (
-      <>
-        <Navbar />
-        <p className="p-6 text-red-600">{error}</p>
-      </>
-    )
-  }
+  const isFull = event.registeredCount >= event.capacity
 
-  // 🔹 Main UI
   return (
     <>
       <Navbar />
       <div className="p-6 max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
-
-        <p className="text-gray-600 mb-1">📍 {event.venue}</p>
-
-        <p className="text-gray-600 mb-4">
+        <h1 className="text-3xl font-bold">{event.title}</h1>
+        <p>📍 {event.venue}</p>
+        <p>
           🕒 {new Date(event.date.seconds * 1000).toLocaleString()}
         </p>
 
-        <p className="mb-4">{event.description}</p>
-
-        <p className="font-medium">
+        <p className="mt-2">{event.description}</p>
+        <p className="mt-2 font-medium">
           Seats: {event.registeredCount} / {event.capacity}
         </p>
 
         {role === "student" && (
-          <button
-            onClick={handleRegister}
-            disabled={registering}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            {registering ? "Registering..." : "Register"}
-          </button>
+          <div className="mt-4 space-y-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your Name"
+              className="w-full p-2 border"
+              disabled={isFull}
+            />
+
+            <input
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              placeholder="Student ID"
+              className="w-full p-2 border"
+              disabled={isFull}
+            />
+
+            <button
+              onClick={handleRegister}
+              disabled={registering || isFull}
+              className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              {isFull
+                ? "Event Full"
+                : registering
+                ? "Registering..."
+                : "Register"}
+            </button>
+
+            {isFull && (
+              <p className="text-red-600 font-semibold">
+                Registration closed — event is full
+              </p>
+            )}
+          </div>
         )}
 
         {message && (
