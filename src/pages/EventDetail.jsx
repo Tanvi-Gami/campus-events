@@ -5,20 +5,18 @@ import { db } from "../services/firebase"
 import Navbar from "../components/Navbar"
 import { useAuth } from "../context/AuthContext"
 import { registerForEvent } from "../services/registrationService"
-
+import { useNavigate } from "react-router-dom"
 export default function EventDetail() {
   const { id } = useParams()
   const { user, role, loading } = useAuth()
-
+  const Navigate = useNavigate()
   const [event, setEvent] = useState(null)
   const [fetching, setFetching] = useState(true)
   const [error, setError] = useState("")
   const [registering, setRegistering] = useState(false)
   const [message, setMessage] = useState("")
-
   const [name, setName] = useState("")
   const [studentId, setStudentId] = useState("")
-
   useEffect(() => {
     const fetchEvent = async () => {
       try {
@@ -36,35 +34,28 @@ export default function EventDetail() {
     }
     fetchEvent()
   }, [id])
-
   const handleRegister = async () => {
     if (!event || !user) return
-
     if (role !== "student") {
       setMessage("Only students can register")
       return
     }
-
     if (event.registeredCount >= event.capacity) {
       setMessage("Event is full")
       return
     }
-
     try {
       setRegistering(true)
       setMessage("")
-
       await registerForEvent(event.id, user, {
         name,
         studentId,
       })
-
-      //  Optimistically update UI
+      // Optimistically update UI
       setEvent((prev) => ({
         ...prev,
         registeredCount: prev.registeredCount + 1,
       }))
-
       setMessage("Registration successful!")
     } catch (err) {
       setMessage(err.message)
@@ -72,28 +63,31 @@ export default function EventDetail() {
       setRegistering(false)
     }
   }
-
   if (loading || fetching) return <p className="p-6">Loading event...</p>
   if (error) return <p className="p-6 text-red-600">{error}</p>
   if (!event) return null
-
   const isFull = event.registeredCount >= event.capacity
-
   return (
     <>
       <Navbar />
       <div className="p-6 max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold">{event.title}</h1>
+        {role === "organizer" && event.organizerId === user.uid && (
+            <button
+              onClick={() => Navigate(`/organizer/events/edit/${event.id}`)}
+              className="mt-2 bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+            >
+              ✏️ Edit Event
+            </button>
+          )}
         <p>📍 {event.venue}</p>
         <p>
           🕒 {new Date(event.date.seconds * 1000).toLocaleString()}
         </p>
-
         <p className="mt-2">{event.description}</p>
         <p className="mt-2 font-medium">
           Seats: {event.registeredCount} / {event.capacity}
         </p>
-
         {role === "student" && (
           <div className="mt-4 space-y-3">
             <input
@@ -103,7 +97,6 @@ export default function EventDetail() {
               className="w-full p-2 border"
               disabled={isFull}
             />
-
             <input
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
@@ -111,7 +104,6 @@ export default function EventDetail() {
               className="w-full p-2 border"
               disabled={isFull}
             />
-
             <button
               onClick={handleRegister}
               disabled={registering || isFull}
@@ -123,7 +115,6 @@ export default function EventDetail() {
                 ? "Registering..."
                 : "Register"}
             </button>
-
             {isFull && (
               <p className="text-red-600 font-semibold">
                 Registration closed — event is full
@@ -131,7 +122,6 @@ export default function EventDetail() {
             )}
           </div>
         )}
-
         {message && (
           <p className="mt-3 text-green-600 font-medium">{message}</p>
         )}

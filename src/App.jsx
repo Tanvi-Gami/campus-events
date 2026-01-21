@@ -5,6 +5,7 @@ import Events from "./pages/Events"
 import ProtectedRoute from "./Components/ProtectedRoute"
 import OrganizerCreateEvent from "./pages/OrganizerCreateEvent"
 import EventDetail from "./pages/EventDetail"
+import OrganizerEditEvent from "./pages/OrganizerEditEvent" // Add this import (adjust path if needed)
 
 function App() {
   return (
@@ -24,7 +25,19 @@ function App() {
         />
         <Route
           path="/organizer/events/create"
-          element={<OrganizerCreateEvent />}
+          element={
+            <ProtectedRoute>
+              <OrganizerCreateEvent />
+            </ProtectedRoute>
+          } // Wrapped in ProtectedRoute for security (optional but recommended)
+        />
+        <Route
+          path="/organizer/events/edit/:id" // New route for edit
+          element={
+            <ProtectedRoute>
+              <OrganizerEditEvent />
+            </ProtectedRoute>
+          }
         />
 
       </Routes>
