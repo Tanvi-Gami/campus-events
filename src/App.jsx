@@ -7,6 +7,7 @@ import OrganizerCreateEvent from "./pages/OrganizerCreateEvent"
 import EventDetail from "./pages/EventDetail"
 import OrganizerEditEvent from "./pages/OrganizerEditEvent" // Add this import (adjust path if needed)
 import OrganizerDashboard from "./pages/OrganizerDashboard"
+import EventRegistrations from "./pages/EventRegistrations"
 
 
 function App() {
@@ -47,6 +48,12 @@ function App() {
             path="/organizer/dashboard"
             element={<OrganizerDashboard />}
         />
+
+      <Route
+  path="/event/:id/registrations"
+  element={<EventRegistrations />}
+/>
+
 
 
       </Routes>
