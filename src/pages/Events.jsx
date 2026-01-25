@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 
 export default function Events() {
-  // ✅ Hooks MUST be at top level
+  
   const { loading, role } = useAuth()
   const navigate = useNavigate()
 
@@ -44,7 +44,7 @@ export default function Events() {
     <>
       <Navbar />
 
-      {/* ✅ Organizer-only button */}
+      {/*  Organizer-only button */}
       {role === "organizer" && (
         <div className="p-6">
           <button
@@ -62,26 +62,33 @@ export default function Events() {
         <div className="p-6 grid gap-4 md:grid-cols-2">
           {events.map((event) => (
             <div
-                key={event.id}
-                onClick={() => navigate(`/event/${event.id}`)}
-                className="border p-4 rounded shadow-sm cursor-pointer hover:shadow-md"
-            >
+            key={event.id}
+            onClick={() => navigate(`/event/${event.id}`)}
+            className="border rounded-lg p-4 shadow-sm hover:shadow-md transition cursor-pointer bg-white"
+            >         
+                    <h2 className="text-lg font-semibold mb-1">
+                      {event.title}
+                    </h2>
 
-              <h2 className="text-xl font-bold">{event.title}</h2>
+                      <p className="text-sm text-gray-500">
+                        📍 {event.venue}
+                      </p>
 
-              <p className="text-gray-600">
-                {new Date(event.date.seconds * 1000).toLocaleString()}
-              </p>
+                      <p className="text-sm text-gray-500">
+                        🕒 {new Date(event.date.seconds * 1000).toLocaleDateString()}
+                      </p>
 
-              <p className="text-gray-600">{event.venue}</p>
-
-              <p className="mt-2 font-medium">
-                Seats: {event.registeredCount} / {event.capacity}
-              </p>
+                      <div className="mt-2 text-sm font-medium">
+                        Seats:
+                        <span className="ml-1">
+                          {event.registeredCount}/{event.capacity}
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+
+                    ))}
+                  </div>
+                )}
     </>
   )
 }

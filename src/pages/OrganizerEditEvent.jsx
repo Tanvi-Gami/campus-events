@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../services/firebase"
 import Navbar from "../components/Navbar"
 import { useAuth } from "../context/AuthContext"
+
 export default function OrganizerEditEvent() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -16,6 +17,7 @@ export default function OrganizerEditEvent() {
   const [date, setDate] = useState("")
   const [venue, setVenue] = useState("")
   const [capacity, setCapacity] = useState("")
+  
   useEffect(() => {
     if (loading) return // 🔐 wait for auth
     const fetchEvent = async () => {
