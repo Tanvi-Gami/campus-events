@@ -79,6 +79,21 @@ export default function OrganizerDashboard() {
       event.date.seconds * 1000 > Date.now()
   )
 
+  // 📊 Analytics
+  const pastEvents = events.filter(
+    (event) => event.date.seconds * 1000 <= Date.now()
+  )
+  
+  const highestRegisteredEvent =
+    events.length > 0
+      ? events.reduce((max, event) =>
+          event.registeredCount > max.registeredCount
+            ? event
+            : max
+        )
+      : null
+
+
   return (
     <>
       <Navbar />
@@ -126,6 +141,49 @@ export default function OrganizerDashboard() {
               </div>
             ))}
           </div>
+
+          {/* 📊 Analytics Insights */}
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4">
+                Analytics & Insights
+              </h2>
+                      
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded shadow">
+                  <p className="text-gray-500 text-sm">
+                    Upcoming vs Past Events
+                  </p>
+                  <p className="text-lg font-medium mt-1">
+                    Upcoming: {upcomingEvents.length}
+                  </p>
+                  <p className="text-lg font-medium">
+                    Past: {pastEvents.length}
+                  </p>
+                </div>
+                      
+                <div className="bg-white p-4 rounded shadow">
+                  <p className="text-gray-500 text-sm">
+                    Highest Registered Event
+                  </p>
+                      
+                  {highestRegisteredEvent ? (
+                    <>
+                      <p className="text-lg font-medium mt-1">
+                        {highestRegisteredEvent.title}
+                      </p>
+                      <p className="text-gray-600">
+                        Registrations:{" "}
+                        {highestRegisteredEvent.registeredCount}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-gray-600 mt-1">
+                      No events yet
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
 
           {/* 📅 Events Section */}
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl p-6">
