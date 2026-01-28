@@ -8,6 +8,7 @@ import EventDetail from "./pages/EventDetail"
 import OrganizerEditEvent from "./pages/OrganizerEditEvent" // Add this import (adjust path if needed)
 import OrganizerDashboard from "./pages/OrganizerDashboard"
 import EventRegistrations from "./pages/EventRegistrations"
+import Calendar from "./pages/Calendar"
 
 
 function App() {
@@ -50,11 +51,11 @@ function App() {
         />
 
       <Route
-  path="/event/:id/registrations"
-  element={<EventRegistrations />}
-/>
+          path="/event/:id/registrations"
+          element={<EventRegistrations />}
+        />
 
-
+      <Route path="/calendar" element={<Calendar />} />
 
       </Routes>
     </BrowserRouter>
