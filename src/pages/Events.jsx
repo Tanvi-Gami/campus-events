@@ -79,12 +79,23 @@ export default function Events() {
                     {event.title}
                   </h2>
 
-                  <div className="space-y-2 mb-6">
+                  <div className="space-y-2 mb-4">
                     <p className="text-sm text-[#CBD5E1]/70 flex items-center gap-2">
                       <span className="text-[#06B6D4]">📍</span> {event.venue}
                     </p>
                     <p className="text-sm text-[#CBD5E1]/70 flex items-center gap-2">
                       <span className="text-[#06B6D4]">🕒</span> {new Date(event.date.seconds * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+
+                  {/* Representative Details Section */}
+                  <div className="space-y-1 mb-6 p-3 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#06B6D4]/60 mb-1">Contact Person</p>
+                    <p className="text-sm font-bold text-[#CBD5E1] flex items-center gap-2">
+                      👤 {event.representativeName || "N/A"}
+                    </p>
+                    <p className="text-xs font-mono text-[#CBD5E1]/60 flex items-center gap-2">
+                      📞 {event.representativePhone || "No contact info"}
                     </p>
                   </div>
 
