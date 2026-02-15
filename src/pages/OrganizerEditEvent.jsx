@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../services/firebase"
-import Navbar from "../components/Navbar"
+import Navbar from "../Components/Navbar"
 import { useAuth } from "../context/AuthContext"
 import Loader from "../Components/Loader"
 
