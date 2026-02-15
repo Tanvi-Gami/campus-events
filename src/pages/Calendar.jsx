@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../services/firebase"
 import { useNavigate } from "react-router-dom"
-import Navbar from "../components/Navbar"
+import Navbar from "../Components/Navbar"
 import Loader from "../Components/Loader"
 import EmptyState from "../Components/EmptyState"
 
