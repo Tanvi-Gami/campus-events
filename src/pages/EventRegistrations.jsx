@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { collection, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "../services/firebase"
 import { useAuth } from "../context/AuthContext"
-import Navbar from "../components/Navbar"
+import Navbar from "../Components/Navbar"
 import Loader from "../Components/Loader"
 import EmptyState from "../Components/EmptyState"
 

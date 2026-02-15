@@ -5,11 +5,13 @@ import Events from "./pages/Events"
 import ProtectedRoute from "./Components/ProtectedRoute"
 import OrganizerCreateEvent from "./pages/OrganizerCreateEvent"
 import EventDetail from "./pages/EventDetail"
-import OrganizerEditEvent from "./pages/OrganizerEditEvent" // Add this import (adjust path if needed)
+import OrganizerEditEvent from "./pages/OrganizerEditEvent"
 import OrganizerDashboard from "./pages/OrganizerDashboard"
 import EventRegistrations from "./pages/EventRegistrations"
 import Calendar from "./pages/Calendar"
-
+import Merch from "./pages/Merch"
+import Fests from "./pages/Fests"
+import FestDetail from "./pages/FestDetail"
 
 function App() {
   return (
@@ -33,30 +35,46 @@ function App() {
             <ProtectedRoute>
               <OrganizerCreateEvent />
             </ProtectedRoute>
-          } // Wrapped in ProtectedRoute for security (optional but recommended)
+          }
         />
-        
+
         <Route
-          path="/organizer/events/edit/:id" // New route for edit
+          path="/organizer/events/edit/:id"
           element={
             <ProtectedRoute>
               <OrganizerEditEvent />
             </ProtectedRoute>
           }
         />
-        
+
+        <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
+        <Route path="/event/:id/registrations" element={<EventRegistrations />} />
+        <Route path="/calendar" element={<Calendar />} />
+
         <Route
-            path="/organizer/dashboard"
-            element={<OrganizerDashboard />}
+          path="/merch"
+          element={
+            <ProtectedRoute>
+              <Merch />
+            </ProtectedRoute>
+          }
         />
-
-      <Route
-          path="/event/:id/registrations"
-          element={<EventRegistrations />}
+        <Route
+          path="/fests"
+          element={
+            <ProtectedRoute>
+              <Fests />
+            </ProtectedRoute>
+          }
         />
-
-      <Route path="/calendar" element={<Calendar />} />
-
+        <Route
+          path="/fests/:festId"
+          element={
+            <ProtectedRoute>
+              <FestDetail />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
