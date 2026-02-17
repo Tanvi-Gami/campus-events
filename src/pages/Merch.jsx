@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from "firebase/firestore"
 import Navbar from "../Components/Navbar"
 import { merchItems } from "../data/merchData"
 import { useAuth } from "../context/AuthContext"
+import { db } from "../services/firebase"
 
 const defaultForm = {
   name: "",
@@ -27,6 +29,39 @@ function fileToDataUrl(file, callback) {
 }
 
 export default function Merch() {
+  const { role, user } = useAuth()
+  const [items, setItems] = useState([])
+  const [selectedId, setSelectedId] = useState("")
+  const [formData, setFormData] = useState(defaultForm)
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const fetchMerch = async () => {
+      try {
+        setLoading(true)
+        const base = collection(db, "merch")
+        const q = role === "organizer" && user
+          ? query(base, where("createdBy", "==", user.uid))
+          : query(base, where("isPublished", "==", true))
+
+        const snap = await getDocs(q)
+        const fromDb = snap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }))
+        const data = fromDb.length > 0 ? fromDb : merchItems
+        setItems(data)
+        setSelectedId(data[0]?.id || "")
+      } catch {
+        setItems(merchItems)
+        setSelectedId(merchItems[0]?.id || "")
+        setMessage("Showing default merch. Database fetch failed.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMerch()
+  }, [role, user])
   const { role } = useAuth()
   const [items, setItems] = useState(merchItems)
   const [selectedId, setSelectedId] = useState(merchItems[0]?.id)
@@ -37,6 +72,9 @@ export default function Merch() {
     [items, selectedId]
   )
 
+  const handleAddMerch = async (event) => {
+    event.preventDefault()
+    if (!user) return
   const handleAddMerch = (event) => {
     event.preventDefault()
 
@@ -50,6 +88,38 @@ export default function Merch() {
 
     const stock = sizeChart.reduce((acc, row) => acc + row.available, 0)
 
+    try {
+      setSaving(true)
+      setMessage("")
+
+      const payload = {
+        name: formData.name,
+        category: formData.category,
+        price: Number(formData.price),
+        stock,
+        color: formData.color,
+        dropDate: formData.dropDate,
+        description: formData.description,
+        paymentRecipient: formData.paymentRecipient,
+        imageUrl: formData.imageUrl,
+        paymentQrUrl: formData.paymentQrUrl,
+        sizeChart,
+        createdBy: user.uid,
+        isPublished: true,
+        createdAt: serverTimestamp(),
+      }
+
+      const newRef = await addDoc(collection(db, "merch"), payload)
+      const newMerch = { id: newRef.id, ...payload }
+      setItems((prev) => [newMerch, ...prev])
+      setSelectedId(newMerch.id)
+      setFormData(defaultForm)
+      setMessage("Merch item published and visible to users.")
+    } catch {
+      setMessage("Failed to save merch. Please try again.")
+    } finally {
+      setSaving(false)
+    }
     const newMerch = {
       id: `${formData.name.toLowerCase().replaceAll(/\s+/g, "-")}-${Date.now()}`,
       name: formData.name,
@@ -101,6 +171,52 @@ export default function Merch() {
 
               <div className="md:col-span-2">
                 <textarea required placeholder="Merch description" rows="3" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={formData.description} onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))} />
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <label className="text-sm font-semibold">Upload merch image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full text-sm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    fileToDataUrl(file, (result) => setFormData((prev) => ({ ...prev, imageUrl: result })))
+                  }}
+                />
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <label className="text-sm font-semibold">Upload payment QR code</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full text-sm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    fileToDataUrl(file, (result) => setFormData((prev) => ({ ...prev, paymentQrUrl: result })))
+                  }}
+                />
+              </div>
+
+              <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl p-4">
+                <h3 className="font-bold mb-3">Size Chart (pieces available)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <input type="number" min="0" placeholder="XS qty" className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2" value={formData.sizeXS} onChange={(e) => setFormData((prev) => ({ ...prev, sizeXS: e.target.value }))} />
+                  <input type="number" min="0" placeholder="S qty" className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2" value={formData.sizeS} onChange={(e) => setFormData((prev) => ({ ...prev, sizeS: e.target.value }))} />
+                  <input type="number" min="0" placeholder="M qty" className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2" value={formData.sizeM} onChange={(e) => setFormData((prev) => ({ ...prev, sizeM: e.target.value }))} />
+                  <input type="number" min="0" placeholder="L qty" className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2" value={formData.sizeL} onChange={(e) => setFormData((prev) => ({ ...prev, sizeL: e.target.value }))} />
+                  <input type="number" min="0" placeholder="XL qty" className="bg-[#020617] border border-white/10 rounded-lg px-3 py-2" value={formData.sizeXL} onChange={(e) => setFormData((prev) => ({ ...prev, sizeXL: e.target.value }))} />
+                </div>
+              </div>
+
+              <button disabled={saving} type="submit" className="md:col-span-2 bg-[#06B6D4] text-[#020617] font-bold rounded-xl px-4 py-3 hover:bg-[#22D3EE] disabled:opacity-70">
+                {saving ? "Saving..." : "Save Merch"}
+              </button>
+            </form>
+            {message && <p className="mt-4 text-sm text-[#06B6D4]">{message}</p>}
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
@@ -228,6 +344,93 @@ export default function Merch() {
               </aside>
             </div>
           </section>
+        )}
+
+        {loading ? (
+          <p className="text-[#CBD5E1]/70">Loading merch...</p>
+        ) : (
+          <>
+            <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 mb-10">
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setSelectedId(item.id)}
+                  className={`text-left p-5 rounded-2xl border transition-all ${
+                    selectedId === item.id
+                      ? "border-[#06B6D4]/70 bg-[#0F172A]"
+                      : "border-white/10 bg-[#0F172A]/60 hover:border-white/25"
+                  }`}
+                >
+                  <p className="text-xs uppercase tracking-widest font-bold text-[#A855F7]">{item.category}</p>
+                  <h2 className="text-lg font-bold mt-2">{item.name}</h2>
+                  <p className="text-sm text-[#CBD5E1]/70 mt-2">{item.description}</p>
+                  <div className="flex justify-between mt-4 text-sm">
+                    <span>₹{item.price}</span>
+                    <span className={`${item.stock < 20 ? "text-orange-300" : "text-emerald-300"}`}>
+                      {item.stock} in stock
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </section>
+
+            {selectedMerch && (
+              <section className="bg-[#0F172A]/70 border border-white/10 rounded-3xl p-6 md:p-8">
+                <div className="grid lg:grid-cols-[1.4fr_1fr] gap-8">
+                  <div>
+                    <div className="rounded-2xl overflow-hidden border border-white/10 mb-5">
+                      {selectedMerch.imageUrl ? (
+                        <img src={selectedMerch.imageUrl} alt={selectedMerch.name} className="w-full h-64 object-cover" />
+                      ) : (
+                        <div className="h-64 bg-white/5 grid place-items-center text-[#CBD5E1]/60">No merch image uploaded</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                      <div>
+                        <h3 className="text-2xl font-black">{selectedMerch.name}</h3>
+                        <p className="text-[#CBD5E1]/70">Color: {selectedMerch.color || "-"} · Drop Date: {selectedMerch.dropDate}</p>
+                      </div>
+                      <div className="text-left md:text-right">
+                        <p className="text-2xl font-black text-[#06B6D4]">₹{selectedMerch.price}</p>
+                        <p className="text-sm text-[#CBD5E1]/70">Available stock: {selectedMerch.stock}</p>
+                      </div>
+                    </div>
+
+                    <h4 className="text-sm uppercase tracking-[0.2em] text-[#A855F7] font-bold mb-3">Size Chart</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-[#CBD5E1]/60 border-b border-white/10">
+                            <th className="py-3">Size</th>
+                            <th className="py-3">Pieces Available</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedMerch.sizeChart?.map((row) => (
+                            <tr key={row.size} className="border-b border-white/5 text-[#E2E8F0]">
+                              <td className="py-3 font-semibold">{row.size}</td>
+                              <td className="py-3">{row.available}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <aside className="rounded-2xl border border-white/10 bg-[#020617]/50 p-5 h-fit">
+                    <h4 className="text-lg font-black mb-2">Payment Details</h4>
+                    <p className="text-sm text-[#CBD5E1]/80 mb-4">Pay to: <span className="font-semibold">{selectedMerch.paymentRecipient || "Not added yet"}</span></p>
+                    {selectedMerch.paymentQrUrl ? (
+                      <img src={selectedMerch.paymentQrUrl} alt="Payment QR code" className="w-full max-w-xs rounded-xl border border-white/10" />
+                    ) : (
+                      <p className="text-sm text-[#CBD5E1]/60">Payment QR code not uploaded yet.</p>
+                    )}
+                  </aside>
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
     </div>

@@ -1,3 +1,10 @@
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from "firebase/firestore"
+import Navbar from "../Components/Navbar"
+import { festData } from "../data/festData"
+import { useAuth } from "../context/AuthContext"
+import { db } from "../services/firebase"
 import { useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
 import Navbar from "../Components/Navbar"
@@ -11,10 +18,42 @@ const defaultEventForm = {
   time: "",
   venue: "",
   seats: "",
+  description: "",
 }
 
 export default function FestDetail() {
   const { festId } = useParams()
+  const { role, user } = useAuth()
+  const navigate = useNavigate()
+
+  const fest = useMemo(() => festData.find((item) => item.id === festId), [festId])
+  const [events, setEvents] = useState([])
+  const [eventForm, setEventForm] = useState(defaultEventForm)
+  const [loadingEvents, setLoadingEvents] = useState(true)
+  const [formMessage, setFormMessage] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const fetchFestEvents = async () => {
+      try {
+        setLoadingEvents(true)
+        const baseRef = collection(db, "events")
+        const q = role === "organizer" && user
+          ? query(baseRef, where("festId", "==", festId), where("organizerId", "==", user.uid))
+          : query(baseRef, where("festId", "==", festId), where("isPublished", "==", true))
+
+        const snap = await getDocs(q)
+        const mapped = snap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }))
+        setEvents(mapped)
+      } catch {
+        setFormMessage("Failed to load fest events right now.")
+      } finally {
+        setLoadingEvents(false)
+      }
+    }
+
+    fetchFestEvents()
+  }, [festId, role, user])
   const { role } = useAuth()
 
   const fest = useMemo(() => festData.find((item) => item.id === festId), [festId])
@@ -35,6 +74,43 @@ export default function FestDetail() {
     )
   }
 
+  const handleAddEvent = async (event) => {
+    event.preventDefault()
+    if (!user) return
+
+    try {
+      setSaving(true)
+      setFormMessage("")
+
+      const dateTimeISO = `${eventForm.day}T${eventForm.time || "00:00"}`
+      const eventDate = new Date(dateTimeISO)
+
+      const payload = {
+        title: eventForm.title,
+        track: eventForm.track,
+        day: eventForm.day,
+        time: eventForm.time,
+        venue: eventForm.venue,
+        capacity: Number(eventForm.seats),
+        registeredCount: 0,
+        date: eventDate,
+        description: eventForm.description || `${eventForm.title} · ${fest.name}`,
+        festId,
+        festName: fest.name,
+        organizerId: user.uid,
+        isPublished: true,
+        createdAt: serverTimestamp(),
+      }
+
+      const newRef = await addDoc(collection(db, "events"), payload)
+      setEvents((prev) => [{ id: newRef.id, ...payload }, ...prev])
+      setEventForm(defaultEventForm)
+      setFormMessage("Fest event created and published for students.")
+    } catch {
+      setFormMessage("Failed to add fest event. Please try again.")
+    } finally {
+      setSaving(false)
+    }
   const handleAddEvent = (event) => {
     event.preventDefault()
 
@@ -77,6 +153,14 @@ export default function FestDetail() {
             <form onSubmit={handleAddEvent} className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               <input required placeholder="Event title" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.title} onChange={(e) => setEventForm((prev) => ({ ...prev, title: e.target.value }))} />
               <input required placeholder="Track" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.track} onChange={(e) => setEventForm((prev) => ({ ...prev, track: e.target.value }))} />
+              <input required type="date" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.day} onChange={(e) => setEventForm((prev) => ({ ...prev, day: e.target.value }))} />
+              <input required type="time" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.time} onChange={(e) => setEventForm((prev) => ({ ...prev, time: e.target.value }))} />
+              <input required type="number" min="1" placeholder="Total seats" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.seats} onChange={(e) => setEventForm((prev) => ({ ...prev, seats: e.target.value }))} />
+              <input required placeholder="Venue" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.venue} onChange={(e) => setEventForm((prev) => ({ ...prev, venue: e.target.value }))} />
+              <textarea placeholder="Description (optional)" rows="3" className="lg:col-span-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.description} onChange={(e) => setEventForm((prev) => ({ ...prev, description: e.target.value }))} />
+              <button disabled={saving} type="submit" className="lg:col-span-3 bg-[#06B6D4] text-[#020617] font-bold rounded-xl px-4 py-3 hover:bg-[#22D3EE] disabled:opacity-70">{saving ? "Saving..." : "Add Event"}</button>
+            </form>
+            {formMessage && <p className="mt-4 text-sm text-[#06B6D4]">{formMessage}</p>}
               <input required placeholder="Day (e.g. Day 1 · 12 Mar 2026)" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.day} onChange={(e) => setEventForm((prev) => ({ ...prev, day: e.target.value }))} />
               <input required placeholder="Time (e.g. 5:00 PM)" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.time} onChange={(e) => setEventForm((prev) => ({ ...prev, time: e.target.value }))} />
               <input required type="number" min="1" placeholder="Total seats" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.seats} onChange={(e) => setEventForm((prev) => ({ ...prev, seats: e.target.value }))} />
@@ -89,11 +173,43 @@ export default function FestDetail() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-black">Events in this Fest</h2>
-            <button className="px-4 py-2 rounded-xl border border-[#22C55E]/40 text-[#22C55E] text-sm font-bold">
-              Register for Fest Pass
-            </button>
           </div>
 
+          {loadingEvents ? (
+            <p className="text-[#CBD5E1]/70">Loading fest events...</p>
+          ) : events.length === 0 ? (
+            <p className="text-[#CBD5E1]/70">No fest events published yet.</p>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {events.map((event) => {
+                const seatsLeft = Number(event.capacity || 0) - Number(event.registeredCount || 0)
+                return (
+                  <article key={event.id} className="rounded-2xl border border-white/10 bg-[#0B1220] p-5">
+                    <p className="text-xs uppercase tracking-widest text-[#A855F7] font-bold mb-2">{event.track}</p>
+                    <h3 className="text-lg font-black mb-1">{event.title}</h3>
+                    <p className="text-sm text-[#CBD5E1]/70">🗓 {event.day}</p>
+                    <p className="text-sm text-[#CBD5E1]/70">🕒 {event.time}</p>
+                    <p className="text-sm text-[#CBD5E1]/70 mb-4">📍 {event.venue}</p>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#CBD5E1]/70">Seats filled</span>
+                      <span className="font-bold">{event.registeredCount || 0}/{event.capacity || 0}</span>
+                    </div>
+                    <p className={`mt-3 text-xs font-bold ${seatsLeft < 15 ? "text-orange-300" : "text-emerald-300"}`}>
+                      {seatsLeft} seats left
+                    </p>
+                    {role === "student" && (
+                      <button
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        className="mt-4 w-full rounded-xl bg-[#06B6D4] text-[#020617] font-bold py-2"
+                      >
+                        View & Register
+                      </button>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {events.map((event) => {
               const seatsLeft = event.seats - event.registrations
