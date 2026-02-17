@@ -5,6 +5,11 @@ import Navbar from "../Components/Navbar"
 import { festData } from "../data/festData"
 import { useAuth } from "../context/AuthContext"
 import { db } from "../services/firebase"
+import { useMemo, useState } from "react"
+import { useParams } from "react-router-dom"
+import Navbar from "../Components/Navbar"
+import { festData } from "../data/festData"
+import { useAuth } from "../context/AuthContext"
 
 const defaultEventForm = {
   title: "",
@@ -49,6 +54,11 @@ export default function FestDetail() {
 
     fetchFestEvents()
   }, [festId, role, user])
+  const { role } = useAuth()
+
+  const fest = useMemo(() => festData.find((item) => item.id === festId), [festId])
+  const [events, setEvents] = useState(fest?.events ?? [])
+  const [eventForm, setEventForm] = useState(defaultEventForm)
 
   if (!fest) {
     return (
@@ -101,6 +111,22 @@ export default function FestDetail() {
     } finally {
       setSaving(false)
     }
+  const handleAddEvent = (event) => {
+    event.preventDefault()
+
+    const newEvent = {
+      id: `${eventForm.title.toLowerCase().replaceAll(/\s+/g, "-")}-${Date.now()}`,
+      title: eventForm.title,
+      track: eventForm.track,
+      day: eventForm.day,
+      time: eventForm.time,
+      venue: eventForm.venue,
+      seats: Number(eventForm.seats),
+      registrations: 0,
+    }
+
+    setEvents((prev) => [newEvent, ...prev])
+    setEventForm(defaultEventForm)
   }
 
   return (
@@ -135,6 +161,12 @@ export default function FestDetail() {
               <button disabled={saving} type="submit" className="lg:col-span-3 bg-[#06B6D4] text-[#020617] font-bold rounded-xl px-4 py-3 hover:bg-[#22D3EE] disabled:opacity-70">{saving ? "Saving..." : "Add Event"}</button>
             </form>
             {formMessage && <p className="mt-4 text-sm text-[#06B6D4]">{formMessage}</p>}
+              <input required placeholder="Day (e.g. Day 1 · 12 Mar 2026)" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.day} onChange={(e) => setEventForm((prev) => ({ ...prev, day: e.target.value }))} />
+              <input required placeholder="Time (e.g. 5:00 PM)" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.time} onChange={(e) => setEventForm((prev) => ({ ...prev, time: e.target.value }))} />
+              <input required type="number" min="1" placeholder="Total seats" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.seats} onChange={(e) => setEventForm((prev) => ({ ...prev, seats: e.target.value }))} />
+              <input required placeholder="Venue" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3" value={eventForm.venue} onChange={(e) => setEventForm((prev) => ({ ...prev, venue: e.target.value }))} />
+              <button type="submit" className="lg:col-span-3 bg-[#06B6D4] text-[#020617] font-bold rounded-xl px-4 py-3 hover:bg-[#22D3EE]">Add Event</button>
+            </form>
           </section>
         )}
 
@@ -178,6 +210,27 @@ export default function FestDetail() {
               })}
             </div>
           )}
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {events.map((event) => {
+              const seatsLeft = event.seats - event.registrations
+              return (
+                <article key={event.id} className="rounded-2xl border border-white/10 bg-[#0B1220] p-5">
+                  <p className="text-xs uppercase tracking-widest text-[#A855F7] font-bold mb-2">{event.track}</p>
+                  <h3 className="text-lg font-black mb-1">{event.title}</h3>
+                  <p className="text-sm text-[#CBD5E1]/70">🗓 {event.day}</p>
+                  <p className="text-sm text-[#CBD5E1]/70">🕒 {event.time}</p>
+                  <p className="text-sm text-[#CBD5E1]/70 mb-4">📍 {event.venue}</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[#CBD5E1]/70">Seats filled</span>
+                    <span className="font-bold">{event.registrations}/{event.seats}</span>
+                  </div>
+                  <p className={`mt-3 text-xs font-bold ${seatsLeft < 15 ? "text-orange-300" : "text-emerald-300"}`}>
+                    {seatsLeft} seats left
+                  </p>
+                </article>
+              )
+            })}
+          </div>
         </section>
       </main>
     </div>
