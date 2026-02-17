@@ -12,6 +12,9 @@ import Calendar from "./pages/Calendar"
 import Merch from "./pages/Merch"
 import Fests from "./pages/Fests"
 import FestDetail from "./pages/FestDetail"
+import CreateMerch from "./pages/CreateMerch"
+import  OrganizerMerchOrders  from "./pages/OrganizerMerchOrders"
+
 
 function App() {
   return (
@@ -75,6 +78,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+      </Routes>
+
+        <Routes>
+        <Route path="/organizer/merch/create" element={<CreateMerch />} />
+        <Route path="/organizer/merch/orders" element={<OrganizerMerchOrders />} />
       </Routes>
     </BrowserRouter>
   )

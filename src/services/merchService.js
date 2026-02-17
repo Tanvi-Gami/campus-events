@@ -1,91 +1,131 @@
 import {
-  addDoc,
-  collection,
-  deleteDoc,
   doc,
-  getDocs,
-  increment,
   runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
+  collection,
+  serverTimestamp
 } from "firebase/firestore"
-import { db } from "./firebase"
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "firebase/storage"
+import { db, storage } from "./firebase"
 
-export async function listMerchItems() {
-  const snapshot = await getDocs(collection(db, "merch"))
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+// Upload screenshot first
+export async function uploadPaymentScreenshot(
+  file,
+  merchId,
+  orderId
+) {
+  const storageRef = ref(
+    storage,
+    `orderScreenshots/${merchId}/${orderId}`
+  )
+
+  await uploadBytes(storageRef, file)
+  return await getDownloadURL(storageRef)
 }
 
-export async function createMerchItem(payload, organizer) {
-  if (!organizer) throw new Error("Organizer not authenticated")
-  await addDoc(collection(db, "merch"), {
-    ...payload,
-    createdBy: organizer.uid,
-    createdByEmail: organizer.email,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function updateMerchItem(merchId, payload) {
-  await updateDoc(doc(db, "merch", merchId), {
-    ...payload,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function removeMerchItem(merchId) {
-  await deleteDoc(doc(db, "merch", merchId))
-}
-
-export async function placeMerchOrder(merchId, user, payload) {
-  if (!user) throw new Error("Please login before ordering")
-
+// Place order (transaction safe)
+export async function placeMerchOrder(
+  merchId,
+  user,
+  orderData
+) {
   const merchRef = doc(db, "merch", merchId)
-  const orderRef = doc(collection(db, "merch", merchId, "orders"))
+  const orderRef = doc(
+    collection(db, "merch", merchId, "orders"),
+    orderData.orderId
+  )
 
   await runTransaction(db, async (transaction) => {
     const merchSnap = await transaction.get(merchRef)
-    if (!merchSnap.exists()) throw new Error("Merch item not found")
 
-    const merchData = merchSnap.data()
-    const selectedSize = merchData.sizeChart?.find((size) => size.size === payload.selectedSize)
+    if (!merchSnap.exists()) {
+      throw new Error("Merch not found")
+    }
 
-    if (!selectedSize) throw new Error("Selected size is not available")
-    if (selectedSize.available <= 0) throw new Error("Selected size is out of stock")
+    const merch = merchSnap.data()
 
-    const updatedSizeChart = merchData.sizeChart.map((size) =>
-      size.size === payload.selectedSize
-        ? { ...size, available: Math.max(0, size.available - 1) }
-        : size
+    const sizeIndex = merch.sizeChart.findIndex(
+      (s) => s.size === orderData.selectedSize
     )
 
+    if (sizeIndex === -1)
+      throw new Error("Invalid size")
+
+    if (merch.sizeChart[sizeIndex].available <= 0)
+      throw new Error("Out of stock")
+
+    merch.sizeChart[sizeIndex].available -= 1
+    merch.totalStock -= 1
+
     transaction.update(merchRef, {
-      sizeChart: updatedSizeChart,
-      stock: increment(-1),
-      updatedAt: serverTimestamp(),
+      sizeChart: merch.sizeChart,
+      totalStock: merch.totalStock
     })
 
     transaction.set(orderRef, {
-      ...payload,
-      orderedBy: user.uid,
-      orderedByEmail: user.email,
-      status: "pending_verification",
-      createdAt: serverTimestamp(),
+      userId: user.uid,
+      name: orderData.name,
+      studentId: orderData.studentId,
+      phone: orderData.phone,
+      selectedSize: orderData.selectedSize,
+      transactionId: orderData.transactionId,
+      paymentScreenshotUrl:
+        orderData.paymentScreenshotUrl,
+      status: "pending",
+      createdAt: serverTimestamp()
     })
   })
 }
 
-export async function listMerchOrders(merchId) {
-  const snapshot = await getDocs(collection(db, "merch", merchId, "orders"))
-  return snapshot.docs.map((order) => ({ id: order.id, ...order.data() }))
-}
-
-export async function updateMerchOrderStatus(merchId, orderId, status) {
-  await setDoc(
-    doc(db, "merch", merchId, "orders", orderId),
-    { status, reviewedAt: serverTimestamp() },
-    { merge: true }
+// Approve / Reject order
+export async function updateOrderStatus(
+  merchId,
+  orderId,
+  newStatus
+) {
+  const merchRef = doc(db, "merch", merchId)
+  const orderRef = doc(
+    db,
+    "merch",
+    merchId,
+    "orders",
+    orderId
   )
+
+  await runTransaction(db, async (transaction) => {
+    const merchSnap = await transaction.get(merchRef)
+    const orderSnap = await transaction.get(orderRef)
+
+    if (!merchSnap.exists() || !orderSnap.exists())
+      throw new Error("Invalid request")
+
+    const merch = merchSnap.data()
+    const order = orderSnap.data()
+
+    if (order.status !== "pending")
+      throw new Error("Already processed")
+
+    if (newStatus === "rejected") {
+      const sizeIndex = merch.sizeChart.findIndex(
+        (s) => s.size === order.selectedSize
+      )
+
+      if (sizeIndex !== -1) {
+        merch.sizeChart[sizeIndex].available += 1
+        merch.totalStock += 1
+      }
+
+      transaction.update(merchRef, {
+        sizeChart: merch.sizeChart,
+        totalStock: merch.totalStock
+      })
+    }
+
+    transaction.update(orderRef, {
+      status: newStatus
+    })
+  })
 }
