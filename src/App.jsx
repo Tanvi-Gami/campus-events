@@ -13,17 +13,20 @@ import Merch from "./pages/Merch"
 import Fests from "./pages/Fests"
 import FestDetail from "./pages/FestDetail"
 import CreateMerch from "./pages/CreateMerch"
-import  OrganizerMerchOrders  from "./pages/OrganizerMerchOrders"
-
+import OrganizerMerchOrders from "./pages/OrganizerMerchOrders"
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+
+        {/* PUBLIC */}
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/event/:id" element={<EventDetail />} />
+        <Route path="/calendar" element={<Calendar />} />
 
+        {/* STUDENT */}
         <Route
           path="/events"
           element={
@@ -32,6 +35,44 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/merch"
+          element={
+            <ProtectedRoute>
+              <Merch />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/fests"
+          element={
+            <ProtectedRoute>
+              <Fests />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/fests/:festId"
+          element={
+            <ProtectedRoute>
+              <FestDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ORGANIZER */}
+        <Route
+          path="/organizer/dashboard"
+          element={
+            <ProtectedRoute>
+              <OrganizerDashboard />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/organizer/events/create"
           element={
@@ -50,39 +91,33 @@ function App() {
           }
         />
 
-        <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
-        <Route path="/event/:id/registrations" element={<EventRegistrations />} />
-        <Route path="/calendar" element={<Calendar />} />
+        <Route
+          path="/event/:id/registrations"
+          element={
+            <ProtectedRoute>
+              <EventRegistrations />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
-          path="/merch"
+          path="/organizer/merch/create"
           element={
             <ProtectedRoute>
-              <Merch />
+              <CreateMerch />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/fests"
-          element={
-            <ProtectedRoute>
-              <Fests />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/fests/:festId"
-          element={
-            <ProtectedRoute>
-              <FestDetail />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
 
-        <Routes>
-        <Route path="/organizer/merch/create" element={<CreateMerch />} />
-        <Route path="/organizer/merch/orders" element={<OrganizerMerchOrders />} />
+        <Route
+          path="/organizer/merch/orders"
+          element={
+            <ProtectedRoute>
+              <OrganizerMerchOrders />
+            </ProtectedRoute>
+          }
+        />
+
       </Routes>
     </BrowserRouter>
   )

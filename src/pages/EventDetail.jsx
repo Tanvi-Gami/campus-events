@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, onSnapshot } from "firebase/firestore"
 import { db } from "../services/firebase"
 import Navbar from "../Components/Navbar"
 import { useAuth } from "../context/AuthContext"
 import { registerForEvent } from "../services/registrationService"
 import Loader from "../Components/Loader"
+import { collection } from "firebase/firestore"
 
 export default function EventDetail() {
   const { id } = useParams()
@@ -20,17 +21,32 @@ export default function EventDetail() {
   const [name, setName] = useState("")
   const [studentId, setStudentId] = useState("")
 
-  useEffect(() => {
-    const fetchEvent = async () => {
-      try {
-        const snap = await getDoc(doc(db, "events", id))
-        if (!snap.exists()) setError("Event not found")
-        else setEvent({ id: snap.id, ...snap.data() })
-      } catch { setError("Failed to load event") }
-      finally { setFetching(false) }
+useEffect(() => {
+  const eventRef = doc(db, "events", id)
+  const registrationsRef = collection(db, "events", id, "registrations")
+
+  const unsubscribeEvent = onSnapshot(eventRef, (snap) => {
+    if (!snap.exists()) {
+      setError("Event not found")
+    } else {
+      setEvent({ id: snap.id, ...snap.data() })
     }
-    fetchEvent()
-  }, [id])
+    setFetching(false)
+  })
+
+  const unsubscribeRegistrations = onSnapshot(registrationsRef, (snapshot) => {
+    setEvent((prev) =>
+      prev ? { ...prev, registeredCount: snapshot.size } : prev
+    )
+  })
+
+  return () => {
+    unsubscribeEvent()
+    unsubscribeRegistrations()
+  }
+}, [id])
+
+
 
   const handleRegister = async () => {
     if (!event || !user) return
@@ -41,7 +57,6 @@ export default function EventDetail() {
       setRegistering(true)
       setMessage("")
       await registerForEvent(event.id, user, { name, studentId })
-      setEvent((prev) => ({ ...prev, registeredCount: prev.registeredCount + 1 }))
       setMessage("Success! You're on the list.")
     } catch (err) { setMessage(err.message) }
     finally { setRegistering(false) }

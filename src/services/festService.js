@@ -9,6 +9,7 @@ import {
   runTransaction,
   serverTimestamp,
   updateDoc,
+  Timestamp, // Added for date conversion
 } from "firebase/firestore"
 import { db } from "./firebase"
 
@@ -25,36 +26,25 @@ export async function getFestById(festId) {
 }
 
 export async function createFest(formData, user) {
-  try {
-    const festData = {
-      ...formData,
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-    };
-    const docRef = await addDoc(collection(db, "fests"), festData);
-    return docRef.id;
-  } catch (error) {
-    throw error;
-  }
+  const festData = { ...formData, createdBy: user.uid, createdAt: serverTimestamp() };
+  const docRef = await addDoc(collection(db, "fests"), festData);
+  return docRef.id;
 }
 
 export async function updateFest(festId, formData) {
-  try {
-    const festRef = doc(db, "fests", festId);
-    await updateDoc(festRef, {
-      ...formData,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    throw error;
-  }
+  const festRef = doc(db, "fests", festId);
+  await updateDoc(festRef, { ...formData, updatedAt: serverTimestamp() });
 }
 
-// --- UNIFIED Event Operations ---
+// --- Event Operations ---
 export async function addFestEvent(festId, payload, user) {
+  // CRITICAL: Convert string date to Firestore Timestamp
+  const dateObj = payload.date ? Timestamp.fromDate(new Date(payload.date)) : serverTimestamp();
+  
   await addDoc(collection(db, "events"), {
     ...payload,
-    festId: festId, // Link to the fest
+    date: dateObj, // Now has .seconds property
+    festId: festId,
     organizerId: user.uid,
     isPublished: true, 
     registeredCount: 0,
@@ -63,10 +53,11 @@ export async function addFestEvent(festId, payload, user) {
   })
 }
 
-// FIXED: Uncommented and properly exported this function to resolve the SyntaxError
 export async function updateFestEvent(eventId, payload) {
+  const dateObj = payload.date ? Timestamp.fromDate(new Date(payload.date)) : serverTimestamp();
   await updateDoc(doc(db, "events", eventId), {
     ...payload,
+    date: dateObj,
     updatedAt: serverTimestamp(),
   })
 }
@@ -87,24 +78,11 @@ export async function registerForFestEvent(eventId, user, payload) {
     if (regSnap.exists()) throw new Error("Already registered")
 
     const eventData = eventSnap.data()
-    if ((eventData.registeredCount || 0) >= (eventData.capacity || eventData.seats)) {
+    if ((eventData.registeredCount || 0) >= (eventData.capacity || 0)) {
       throw new Error("This event is full")
     }
 
-    transaction.update(eventRef, {
-      registeredCount: increment(1),
-      updatedAt: serverTimestamp(),
-    })
-    transaction.set(regRef, {
-      ...payload,
-      userId: user.uid,
-      email: user.email,
-      createdAt: serverTimestamp(),
-    })
+    transaction.update(eventRef, { registeredCount: increment(1), updatedAt: serverTimestamp() })
+    transaction.set(regRef, { ...payload, userId: user.uid, email: user.email, createdAt: serverTimestamp() })
   })
-}
-
-export async function listFestEventRegistrations(festId, eventId) {
-  const snapshot = await getDocs(collection(db, "fests", festId, "events", eventId, "registrations"))
-  return snapshot.docs.map((reg) => ({ id: reg.id, ...reg.data() }))
 }
