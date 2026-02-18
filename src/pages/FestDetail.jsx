@@ -1,257 +1,80 @@
 import { useEffect, useState } from "react"
-import { collection, doc, onSnapshot } from "firebase/firestore"
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore"
 import { useParams } from "react-router-dom"
 import Navbar from "../Components/Navbar"
 import { useAuth } from "../context/AuthContext"
-import {
-  addFestEvent,
-  listFestEventRegistrations,
-  registerForFestEvent,
-  removeFestEvent,
-  updateFestEvent,
-} from "../services/festService"
+import { addFestEvent, registerForFestEvent, removeFestEvent, updateFestEvent } from "../services/festService"
 import { db } from "../services/firebase"
-
-const initialEventForm = {
-  title: "",
-  track: "",
-  time: "",
-  seats: "",
-}
+import { createFest, getFestById } from "../services/festService"
+const initialEventForm = { title: "", track: "", date: "", capacity: "", venue: "" }
 
 export default function FestDetail() {
   const { festId } = useParams()
   const { role, user } = useAuth()
-
   const [fest, setFest] = useState(null)
   const [events, setEvents] = useState([])
-  const [message, setMessage] = useState("")
   const [eventForm, setEventForm] = useState(initialEventForm)
   const [editingEventId, setEditingEventId] = useState(null)
-  const [studentForm, setStudentForm] = useState({ name: "", studentId: "" })
-  const [registrationStats, setRegistrationStats] = useState({})
 
   useEffect(() => {
-    const unsubFest = onSnapshot(
-      doc(db, "fests", festId),
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          setFest(null)
-          return
-        }
-        setFest({ id: snapshot.id, ...snapshot.data() })
-      }
-    )
+    const unsubFest = onSnapshot(doc(db, "fests", festId), (snap) => {
+      if (snap.exists()) setFest({ id: snap.id, ...snap.data() })
+    })
 
-    const unsubEvents = onSnapshot(
-      collection(db, "fests", festId, "events"),
-      (snapshot) => {
-        setEvents(
-          snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-        )
-      }
-    )
+    // Search root events collection for events linked to this Fest
+    const q = query(collection(db, "events"), where("festId", "==", festId))
+    const unsubEvents = onSnapshot(q, (snap) => {
+      setEvents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+    })
 
-    return () => {
-      unsubFest()
-      unsubEvents()
-    }
+    return () => { unsubFest(); unsubEvents(); }
   }, [festId])
 
   const submitFestEvent = async (e) => {
     e.preventDefault()
-    if (role !== "organizer") return
-
-    const payload = {
-      title: eventForm.title,
-      track: eventForm.track,
-      time: eventForm.time,
-      seats: Number(eventForm.seats),
-    }
-
     try {
-      if (editingEventId) {
-        await updateFestEvent(festId, editingEventId, payload)
-        setMessage("Fest event updated")
-      } else {
-        await addFestEvent(festId, payload)
-        setMessage("Fest event added")
+      const payload = { 
+        ...eventForm, 
+        date: new Date(eventForm.date), 
+        capacity: Number(eventForm.capacity) 
       }
-
-      setEventForm(initialEventForm)
-      setEditingEventId(null)
-    } catch (err) {
-      setMessage(err.message || "Could not save event")
-    }
-  }
-
-  const handleRegistration = async (eventId) => {
-    try {
-      await registerForFestEvent(festId, eventId, user, studentForm)
-      setMessage("Registered for fest event")
-      setStudentForm({ name: "", studentId: "" })
-    } catch (err) {
-      setMessage(err.message || "Registration failed")
-    }
-  }
-
-  const fetchRegistrationCount = async (eventId) => {
-    const regs = await listFestEventRegistrations(festId, eventId)
-    setRegistrationStats((prev) => ({
-      ...prev,
-      [eventId]: regs.length,
-    }))
-  }
-
-  if (!fest) {
-    return (
-      <div className="min-h-screen bg-[#020617] text-white">
-        <Navbar />
-        <div className="pt-32 px-6">Loading fest details...</div>
-      </div>
-    )
+      if (editingEventId) {
+        await updateFestEvent(editingEventId, payload)
+      } else {
+        await addFestEvent(festId, payload, user)
+      }
+      setEventForm(initialEventForm); setEditingEventId(null)
+    } catch (err) { alert(err.message) }
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white font-['Inter']">
+    <div className="min-h-screen bg-[#020617] text-white">
       <Navbar />
-
       <main className="pt-28 pb-12 px-6 max-w-7xl mx-auto space-y-8">
-        <section className="rounded-3xl border border-white/10 bg-[#0F172A]/70 p-7">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#06B6D4] font-bold mb-2">
-            {fest.theme}
-          </p>
-          <h1 className="text-4xl font-black mb-3">{fest.name}</h1>
-          <p className="text-[#CBD5E1]/70">{fest.overview}</p>
-        </section>
-
-        {/* Organizer Form */}
+        <h1 className="text-4xl font-black">{fest?.name}</h1>
+        
         {role === "organizer" && (
-          <section className="rounded-2xl border border-white/10 bg-[#0F172A]/70 p-6">
-            <h2 className="text-xl font-bold mb-3">
-              {editingEventId ? "Edit Fest Event" : "Add Fest Event"}
-            </h2>
-
-            <form onSubmit={submitFestEvent} className="grid md:grid-cols-2 gap-4">
-              <input required className="p-3 rounded-lg bg-white/5 border border-white/10"
-                placeholder="Event title"
-                value={eventForm.title}
-                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-              />
-
-              <input required className="p-3 rounded-lg bg-white/5 border border-white/10"
-                placeholder="Track"
-                value={eventForm.track}
-                onChange={(e) => setEventForm({ ...eventForm, track: e.target.value })}
-              />
-
-              <input required className="p-3 rounded-lg bg-white/5 border border-white/10"
-                placeholder="Time"
-                value={eventForm.time}
-                onChange={(e) => setEventForm({ ...eventForm, time: e.target.value })}
-              />
-
-              <input required type="number"
-                className="p-3 rounded-lg bg-white/5 border border-white/10"
-                placeholder="Total seats"
-                value={eventForm.seats}
-                onChange={(e) => setEventForm({ ...eventForm, seats: e.target.value })}
-              />
-
-              <div className="md:col-span-2 flex gap-2">
-                <button className="px-4 py-2 rounded-lg bg-[#A855F7] font-bold">
-                  {editingEventId ? "Update Event" : "Create Event"}
-                </button>
-              </div>
-            </form>
-          </section>
+          <form onSubmit={submitFestEvent} className="grid md:grid-cols-3 gap-4 bg-white/5 p-6 rounded-2xl">
+            <input required placeholder="Title" className="bg-white/5 p-3 rounded-lg" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} />
+            <input required type="datetime-local" className="bg-white/5 p-3 rounded-lg" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} />
+            <input required placeholder="Capacity" type="number" className="bg-white/5 p-3 rounded-lg" value={eventForm.capacity} onChange={e => setEventForm({...eventForm, capacity: e.target.value})} />
+            <button className="md:col-span-3 bg-[#A855F7] py-3 rounded-xl font-bold">Save Event</button>
+          </form>
         )}
 
-        {/* Events List */}
-        <section>
-          <h2 className="text-2xl font-black mb-4">Events in this Fest</h2>
-
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {events.map((event) => {
-              const registered = registrationStats[event.id] || 0
-              const seatsLeft = event.seats - registered
-
-              return (
-                <article key={event.id}
-                  className="rounded-2xl border border-white/10 bg-[#0B1220] p-5">
-
-                  <p className="text-xs uppercase tracking-widest text-[#A855F7] font-bold mb-2">
-                    {event.track}
-                  </p>
-
-                  <h3 className="text-lg font-black mb-2">
-                    {event.title}
-                  </h3>
-
-                  <p className="text-sm text-[#CBD5E1]/70 mb-2">
-                    {event.time}
-                  </p>
-
-                  <p className="text-sm text-[#CBD5E1]/70">
-                    {registered}/{event.seats} seats filled
-                  </p>
-
-                  <p className={`mt-2 text-xs font-bold ${
-                    seatsLeft < 10 ? "text-orange-300" : "text-emerald-300"
-                  }`}>
-                    {seatsLeft} seats left
-                  </p>
-
-                  {role === "student" && (
-                    <button
-                      disabled={seatsLeft <= 0}
-                      className="mt-3 px-3 py-2 rounded-lg bg-[#22C55E]/20 text-[#86EFAC] text-sm disabled:opacity-50"
-                      onClick={() => handleRegistration(event.id)}
-                    >
-                      Register for this event
-                    </button>
-                  )}
-
-                  {role === "organizer" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        className="px-3 py-1 rounded bg-white/10 text-xs"
-                        onClick={() => {
-                          setEditingEventId(event.id)
-                          setEventForm({
-                            title: event.title || "",
-                            track: event.track || "",
-                            time: event.time || "",
-                            seats: event.seats || "",
-                          })
-                        }}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="px-3 py-1 rounded bg-red-500/20 text-red-300 text-xs"
-                        onClick={() => removeFestEvent(festId, event.id)}
-                      >
-                        Delete
-                      </button>
-
-                      <button
-                        className="px-3 py-1 rounded bg-cyan-500/20 text-cyan-200 text-xs"
-                        onClick={() => fetchRegistrationCount(event.id)}
-                      >
-                        View Registrations
-                      </button>
-                    </div>
-                  )}
-                </article>
-              )
-            })}
-          </div>
-        </section>
+        <div className="grid md:grid-cols-3 gap-6">
+          {events.map(event => (
+            <div key={event.id} className="p-6 bg-white/5 border border-white/10 rounded-2xl">
+              <h3 className="text-xl font-bold">{event.title}</h3>
+              <p className="text-sm text-slate-400">
+                {event.date?.seconds ? new Date(event.date.seconds * 1000).toLocaleString() : "Date TBD"}
+              </p>
+              {role === "student" && (
+                <button onClick={() => registerForFestEvent(event.id, user, {})} className="w-full mt-4 bg-emerald-500/20 text-emerald-400 py-2 rounded-lg">Register</button>
+              )}
+            </div>
+          ))}
+        </div>
       </main>
     </div>
   )

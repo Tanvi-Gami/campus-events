@@ -19,10 +19,9 @@ export default function OrganizerEditEvent() {
   const [date, setDate] = useState("")
   const [venue, setVenue] = useState("")
   const [capacity, setCapacity] = useState("")
-  // New state for organizer details
-  const [organizerName, setOrganizerName] = useState("")
-  const [organizerContact, setOrganizerContact] = useState("")
-  const [isPublished, setIsPublished] = useState(false) // Added state for publishing
+  const [repName, setRepName] = useState("") // Unified Name
+  const [repPhone, setRepPhone] = useState("") // Unified Phone
+  const [isPublished, setIsPublished] = useState(false)
 
   useEffect(() => {
     if (loading) return
@@ -31,139 +30,75 @@ export default function OrganizerEditEvent() {
         const snap = await getDoc(doc(db, "events", id))
         if (!snap.exists()) { setError("Event not found"); return; }
         const data = snap.data()
-        if (role !== "organizer" || data.organizerId !== user.uid) { setError("Access denied: You don't own this event."); return; }
         
-        setTitle(data.title)
-        setDescription(data.description)
-        setVenue(data.venue)
-        setCapacity(data.capacity)
-        setIsPublished(data.isPublished || false) // Load publication status
-        setOrganizerName(data.organizerName || "") // Load new fields
-        setOrganizerContact(data.organizerContact || "") // Load new fields
+        setTitle(data.title || "")
+        setDescription(data.description || "")
+        setVenue(data.venue || "")
+        setCapacity(data.capacity || "")
+        setRepName(data.representativeName || "") // Pull from correct key
+        setRepPhone(data.representativePhone || "") // Pull from correct key
+        setIsPublished(data.isPublished || false)
         
-        const eventDate = data.date ? new Date(data.date.seconds * 1000) : null
-        if (!eventDate || isNaN(eventDate.getTime())) { setError("Invalid date format."); return; }
-        setDate(eventDate.toISOString().slice(0, 16))
-      } catch { setError("Failed to load event hub.") }
+        if (data.date) {
+          const d = new Date(data.date.seconds * 1000)
+          setDate(d.toISOString().slice(0, 16))
+        }
+      } catch (err) { setError("Failed to load event") }
       finally { setFetching(false) }
     }
     fetchEvent()
-  }, [id, loading, role, user])
+  }, [id, loading])
 
   const handleSave = async (e) => {
     e.preventDefault()
+    setSaving(true)
     try {
-      setSaving(true)
       await updateDoc(doc(db, "events", id), {
         title,
         description,
         venue,
         capacity: Number(capacity),
         date: new Date(date),
-        organizerName, // Save new fields
-        organizerContact, // Save new fields
-        isPublished, // Save publication status
+        representativeName: repName, // Save to unified key
+        representativePhone: repPhone, // Save to unified key
+        isPublished
       })
-      navigate(`/event/${id}`)
-    } catch { setError("Update failed. Check your connection.") }
+      navigate("/organizer/dashboard")
+    } catch (err) { setError("Update failed") }
     finally { setSaving(false) }
   }
 
-  if (loading || fetching) return <Loader text="Opening Editor..." />
+  if (fetching) return <Loader />
 
   return (
-    <div className="min-h-screen bg-[#020617] font-['Inter'] text-white">
+    <div className="min-h-screen bg-[#020617] text-white">
       <Navbar />
-      
-      <div className="pt-32 px-6 max-w-2xl mx-auto">
-        <header className="mb-10 text-center">
-          <h1 className="text-4xl font-black mb-2 tracking-tight">
-            Edit <span className="text-[#A855F7]">Event</span>
-          </h1>
-          <p className="text-[#CBD5E1]/50 text-sm italic">Refining the experience for your attendees</p>
-        </header>
-
-        {error && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-center text-sm font-bold">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSave} className="space-y-6 bg-[#0F172A]/50 border border-white/10 p-8 rounded-3xl shadow-2xl backdrop-blur-xl">
-          {/* ... (Event Details Fields - Title, Description, Date, Capacity, Venue) ... */}
-           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Event Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all font-bold text-lg" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} required className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all h-32 resize-none text-[#CBD5E1]" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Date & Time</label>
-              <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all text-sm font-mono" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Total Capacity</label>
-              <input type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} required className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all text-sm font-mono" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Venue Location</label>
-            <input value={venue} onChange={(e) => setVenue(e.target.value)} required className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all" />
-          </div>
-
-
-          {/* --- NEW ORGANIZER DETAILS SECTION --- */}
-          <div className="pt-6 border-t border-white/10">
-            <h2 className="text-lg font-bold mb-4">Organizer Contact Info</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Organizer Name</label>
-                    <input value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} placeholder="Full Name" className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all" required />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-[#06B6D4] ml-1">Contact Phone/Email</label>
-                    <input value={organizerContact} onChange={(e) => setOrganizerContact(e.target.value)} placeholder="+1 (555) 123-4567" className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-1 focus:ring-[#06B6D4] outline-none transition-all text-sm font-mono" required />
-                </div>
-            </div>
-          </div>
-          {/* --- END NEW SECTION --- */}
+      <main className="pt-28 pb-12 px-6 max-w-3xl mx-auto">
+        <h1 className="text-3xl font-black mb-8">Edit Event Details</h1>
+        <form onSubmit={handleSave} className="space-y-6">
+          <input required placeholder="Event Title" className="w-full p-4 bg-white/5 border border-white/10 rounded-xl" value={title} onChange={e => setTitle(e.target.value)} />
+          <textarea required placeholder="Description" className="w-full p-4 bg-white/5 border border-white/10 rounded-xl h-32" value={description} onChange={e => setDescription(e.target.value)} />
           
-          {/* --- PUBLISH CHECKBOX (Added functionality) --- */}
-          <div className="flex items-center pt-4">
-            <input
-                id="isPublished"
-                type="checkbox"
-                checked={isPublished}
-                onChange={(e) => setIsPublished(e.target.checked)}
-                className="form-checkbox h-5 w-5 text-[#A855F7] bg-white/5 border-white/20 rounded focus:ring-[#A855F7] transition duration-150 ease-in-out"
-            />
-            <label htmlFor="isPublished" className="ml-3 text-sm font-medium text-white">
-                Publish Event Now (Visible to all students)
-            </label>
+          <div className="grid grid-cols-2 gap-4">
+             <input type="datetime-local" className="p-4 bg-white/5 border border-white/10 rounded-xl" value={date} onChange={e => setDate(e.target.value)} />
+             <input type="number" placeholder="Capacity" className="p-4 bg-white/5 border border-white/10 rounded-xl" value={capacity} onChange={e => setCapacity(e.target.value)} />
           </div>
 
-
-          <div className="flex gap-4 pt-4">
-            <button
-              type="button"
-              onClick={() => navigate("/organizer/dashboard")} // Updated navigate location
-              className="flex-1 py-4 rounded-xl font-bold border border-white/10 hover:bg-white/5 transition-all active:scale-95"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex- py-4 bg-[#A855F7] hover:bg-[#9333EA] text-white rounded-xl font-black shadow-lg shadow-[#A855F7]/20 transition-all active:scale-95 disabled:opacity-50"
-            >
-              {saving ? "SYNCING UPDATES..." : "SAVE CHANGES"}
-            </button>
+          <div className="grid grid-cols-2 gap-4">
+             <input placeholder="Rep Name" className="p-4 bg-white/5 border border-white/10 rounded-xl" value={repName} onChange={e => setRepName(e.target.value)} />
+             <input placeholder="Rep Phone" className="p-4 bg-white/5 border border-white/10 rounded-xl" value={repPhone} onChange={e => setRepPhone(e.target.value)} />
           </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" checked={isPublished} onChange={e => setIsPublished(e.target.checked)} className="w-5 h-5 accent-[#A855F7]" />
+            <span>Publish to Calendar</span>
+          </label>
+
+          <button type="submit" disabled={saving} className="w-full py-4 bg-[#A855F7] rounded-xl font-black">
+            {saving ? "Saving Changes..." : "Update Event"}
+          </button>
         </form>
-      </div>
+      </main>
     </div>
   )
 }
